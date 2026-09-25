@@ -569,6 +569,41 @@ canvas{display:block;}
 .optrow .btn{flex:1;}
 .optrow .btn.on{border-color:var(--gold); color:var(--gold);
   box-shadow:0 0 10px rgba(216,180,90,.35), inset 0 0 8px rgba(216,180,90,.15);}
+
+/* ---------- tutorial coach-marks ---------- */
+#tutmask{position:fixed; inset:0; z-index:70; display:none; pointer-events:none;}
+#tutmask .shade{position:absolute; background:rgba(12,8,20,.72); transition:all .25s ease;}
+#tutmask .ring{position:absolute; border:2px solid var(--gold); border-radius:10px; pointer-events:none;
+  animation:tutring 1.2s ease-in-out infinite;
+  transition:left .25s ease, top .25s ease, width .25s ease, height .25s ease;}
+@keyframes tutring{
+  0%,100%{box-shadow:0 0 0 3px rgba(216,180,90,.25), 0 0 18px 2px rgba(216,180,90,.35);}
+  50%{box-shadow:0 0 0 6px rgba(216,180,90,.45), 0 0 34px 10px rgba(216,180,90,.75);}
+}
+@media (prefers-reduced-motion:reduce){ #tutmask .ring{animation:none;} }
+#tutbubble{position:fixed; z-index:72; width:min(340px,88vw); max-height:calc(var(--vh,1vh) * 60);
+  padding:15px 17px 13px; display:none; flex-direction:column;}
+#tutbubble .teyebrow{font-family:var(--disp); font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold); margin-bottom:5px; flex:0 0 auto;}
+#tutbubble h3{font-family:var(--disp); font-weight:700; font-size:16px; letter-spacing:.03em; margin:0 0 6px; color:var(--ink); flex:0 0 auto;}
+#tuttext{font-size:14px; line-height:1.5; color:var(--ink); overflow-y:auto; flex:1 1 auto; min-height:0; overscroll-behavior:contain;}
+#tuttext p{margin:0 0 7px;}
+#tutbubble .trow{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; padding-top:8px;
+  border-top:1px solid rgba(216,180,90,.18); flex:0 0 auto;}
+#tutbubble .tstep{font-size:11px; color:var(--ink2); font-family:var(--disp); letter-spacing:.08em;}
+#tutbubble .tbtns{display:flex; gap:7px;}
+#tutbubble .btn{padding:7px 13px; font-size:12px;}
+#tutpeek{position:fixed; z-index:72; display:none; left:8px; top:50%; transform:translateY(-50%);
+  font-family:var(--disp); font-size:11px; letter-spacing:.06em; color:#f0d98a; cursor:pointer;
+  background:linear-gradient(180deg,#2e2248,#1d1432); border:1px solid var(--gold2);
+  border-radius:14px; padding:6px 14px; box-shadow:0 2px 8px rgba(0,0,0,.45);}
+#tutskip{position:fixed; z-index:73; right:10px; bottom:10px; display:none; font-size:10.5px; padding:6px 11px;}
+@media (max-width:640px){
+  #tutbubble{width:min(320px,90vw); padding:11px 13px 10px;}
+  #tutbubble h3{font-size:14px;}
+  #tuttext{font-size:12.5px; line-height:1.45;}
+  #tutbubble .btn{padding:6px 10px; font-size:11px;}
+  #tutskip{bottom:auto; top:44px; right:6px;}
+}
 </style>
 <style>:root{--vh:calc(var(--vh) * 1);}</style>
 <script>
@@ -615,6 +650,7 @@ canvas{display:block;}
       <div class="modecard" style="flex:1 1 260px; max-width:300px; border:1px solid var(--gold2); border-radius:6px; padding:15px 14px; background:rgba(0,0,0,.18);">
         <div style="display:flex; flex-direction:column; gap:7px; align-items:center;">
           <button class="btn gold" id="beginGame" style="width:100%;">Join the Dance</button>
+          <button class="btn" id="tutGame" style="width:100%;">Tutorial</button>
           <button class="btn" id="rulesGame" style="width:100%;">Read the Rules</button>
         </div>
       </div>
@@ -786,6 +822,27 @@ canvas{display:block;}
   <button class="btn gold small" id="modalrestore" style="padding: 5px 10px; font-size: 11px;">Return to Choices</button>
 </div>
  
+<div id="tutmask">
+  <div class="shade" data-s="top"></div><div class="shade" data-s="bottom"></div>
+  <div class="shade" data-s="left"></div><div class="shade" data-s="right"></div>
+  <div class="ring"></div>
+</div>
+<div id="tutbubble" class="panel">
+  <div class="teyebrow" id="tuteyebrow">Tutorial</div>
+  <h3 id="tuttitle"></h3>
+  <div id="tuttext"></div>
+  <div class="trow">
+    <span class="tstep" id="tutstep"></span>
+    <div class="tbtns">
+      <button class="btn ghost" id="tutmin" title="Hide this lesson for a moment">&ndash;</button>
+      <button class="btn ghost" id="tutback">Back</button>
+      <button class="btn gold" id="tutnext">Next</button>
+    </div>
+  </div>
+</div>
+<button id="tutpeek" title="Show the lesson">Tutorial</button>
+<button class="btn ghost" id="tutskip" title="Leave the tutorial and play a real game">Skip to a real game</button>
+
 <div id="reveal"><div class="panel">
   <h2 id="revtitle">A COURT IS CALLED</h2>
   <div class="sub" id="revsub"></div>
@@ -2860,7 +2917,7 @@ function init3D(mode){
   requestAnimationFrame(loop);
  
   const standGroup=new THREE.Group(); scene.add(standGroup);
-  SCENE={scene,pawnGroup,nobleGroup,courtHits,redrawTri,tileGroup,tiles:[],ghosts:[],pawnList:[],iconHits:iconHitList, callCrown:()=>{calling=true;}, camera, standGroup};
+  SCENE={scene,pawnGroup,nobleGroup,courtHits,redrawTri,tileGroup,tiles:[],ghosts:[],pawnList:[],iconHits:iconHitList, callCrown:()=>{calling=true;}, callReset:()=>{ calling=false; callT=0; callLight=0; if(camFrom){ cam.phi=camFrom.phi; cam.r=camFrom.r; camFrom=null; placeCam(); } beamMotes.forEach(d=>{ d.s.visible=false; }); }, camera, standGroup};
   WISP_TRAIL=makeWispTrail(scene, TEX_MOTE);
 }
  
@@ -4606,6 +4663,7 @@ async function allocateHuman(actor, owner, points, opts={}){
   let lockCi = null;                 // single-dancer mode: locks after the first move
   while(points>0 && !G.over){
     const res=await seatMoveChoice(actor, owner, points, lockCi, opts);
+    if(TUT.afterMove){ const f=TUT.afterMove; TUT.afterMove=null; try{ f(); }catch(_){} }
     if(res==='stop') break;
     const c=owner.cands[res.ci];
     const cost = c.track ? res.step-c.steps : res.step;
@@ -4742,6 +4800,12 @@ async function placeNoble(houseId, actor){
 }
  
 async function pickHouseForNoble(actor){
+  if(actor.isHuman && TUT.guide){
+    const h=HOUSE_BY_ID[TUT.guide.court], n=G.nobles[h.id];
+    return await seatChoose(actor, 'Place a Wisp',
+      `Your dance is complete! First, place a Wisp in any Court. Put it in <b>your own Court, the ${h.name}</b>: that makes <b>${n+1}</b>, enough to Call.`,
+      [{label:h.name, cls:'house'+h.id, sub:`${n} Wisps now`, value:h.id}]);
+  }
   if(actor.isHuman){
     const opts=HOUSES.map(h=>{
       const n=G.nobles[h.id], warn=n+1>=coupAt();
@@ -4763,6 +4827,14 @@ async function kingdomAction(p, track){
 }
  
 async function humanKingdomAction(p, track){
+  if(TUT.guide){
+    const h=HOUSE_BY_ID[TUT.guide.court];
+    const v=await seatChoose(p, `${track} complete`,
+      `Now take <b>one</b> action. Usually you would draw Faerie Magik or take one of this dance’s Favors, but the ${h.name} holds <b>${G.nobles[h.id]}</b> Wisps and you belong to it, so you can end the game: <b>Call a Court</b>.`,
+      [{label:`✦ CALL A COURT: ${h.name}`, cls:'warn', sub:'Everyone reveals; the highest Radiance belonging to this Court wins.', value:{call:h.id}}]);
+    if(v && v.call) return callForThrone(v.call, p, false);
+    return;
+  }
   const anyNobles=HOUSES.some(h=>G.nobles[h.id]>0);
   const anyLurable=HOUSES.some(h=>G.nobles[h.id]>0 && !protectedCourt(h.id));
   const per={
@@ -5396,6 +5468,7 @@ async function callForThroneInner(houseId, caller, isCoup){
   });
   $('#revtitle').textContent = winner ? (winner.isHuman? 'YOU JOIN THE HIGH FAE' : `${winner.name.toUpperCase()} JOINS THE HIGH FAE`) : 'NO ONE WINS THE CALL';
 
+  if(TUT.staged && typeof tutRevealCaption==='function') tutRevealCaption(houseId, caller, winner);
   $('#reveal').style.display='flex';
   throw new GameOver();
 }
@@ -8552,9 +8625,329 @@ addEventListener('keydown', e=>{ if(e.key==='Escape' && $('#rulesread').style.di
 (function(){ const e=document.querySelector('#setup .triemblem'); if(!e) return;
   const u='url("'+ART.triskele+'")'; e.style.webkitMaskImage=u; e.style.maskImage=u; })();
 
-/* The guided tour is not part of Triskele. Engine code still asks TUT
-   whether a lesson is steering play; the answer is always no. */
-const TUT = {};
+/* ============================================================
+   THE TUTORIAL: six short chapters, then a real game.
+   Told steps spotlight one thing at a time; one hands-on step plays a
+   Rune for real; the last chapter stages a turn that wins by a Call.
+   Engine code asks TUT whether a lesson is steering play:
+     TUT.forceRune  only this Rune may be clicked
+     TUT.guide      {court, lock}: the staged win's Court, and the one legal stone
+     TUT.tourActive Faerie Magik cannot interrupt during the tour
+     TUT.staged     the reveal explains why you won
+   ============================================================ */
+const TUT = { steps:null, i:0, done:null, skip:false, chapter:null, tourActive:false };
+
+/* the board's footprint on screen: project a circle of world radius r */
+function boardSpot(r){
+  return { getBoundingClientRect(){
+    if(!SCENE || !SCENE.camera) return {left:0,top:0,right:0,bottom:0,width:0,height:0};
+    let l=1e9,t=1e9,rr=-1e9,b=-1e9;
+    for(let k=0;k<48;k++){
+      const a=k/48*Math.PI*2;
+      const v=new THREE.Vector3(Math.cos(a)*r, TRI_TOP, Math.sin(a)*r).project(SCENE.camera);
+      const px=(v.x*.5+.5)*innerWidth, py=(-v.y*.5+.5)*innerHeight;
+      l=Math.min(l,px); rr=Math.max(rr,px); t=Math.min(t,py); b=Math.max(b,py);
+    }
+    l=Math.max(0,l); t=Math.max(0,t); rr=Math.min(innerWidth,rr); b=Math.min(innerHeight,b);
+    return {left:l, top:t, right:rr, bottom:b, width:rr-l, height:b-t};
+  }};
+}
+/* one rival's stand (the one across the table): its card and its name plate */
+function tutFacingRival(){
+  const SG=SCENE && SCENE.standGroup;
+  if(!SG || !SG.children.length) return null;
+  const st=SG.children[Math.floor((SG.children.length-1)/2)];
+  return G.players[st.userData.seat] ? {st, p:G.players[st.userData.seat]} : null;
+}
+function standsSpot(){
+  const fr=tutFacingRival(); if(!fr) return null;
+  const st=fr.st;
+  st.updateMatrixWorld(true);
+  const pts=[];
+  const box=new THREE.Box3().setFromObject(st.userData.card);
+  for(const x of [box.min.x,box.max.x]) for(const y of [box.min.y,box.max.y]) for(const z of [box.min.z,box.max.z]) pts.push(new THREE.Vector3(x,y,z));
+  const pl=st.userData.plate, c=new THREE.Vector3(); pl.getWorldPosition(c);
+  pts.push(c.clone().add(new THREE.Vector3(0,.8,0)));
+  let l=1e9,t=1e9,r=-1e9,b=-1e9;
+  pts.forEach(v0=>{ const v=v0.project(SCENE.camera);
+    const px=(v.x*.5+.5)*innerWidth, py=(-v.y*.5+.5)*innerHeight;
+    l=Math.min(l,px); r=Math.max(r,px); t=Math.min(t,py); b=Math.max(b,py); });
+  const padX=Math.max(0,(160-(r-l))/2);   // the name plate is wider than the card
+  l=Math.max(0,l-padX); r=Math.min(innerWidth,r+padX); t=Math.max(0,t); b=Math.min(innerHeight,b);
+  if(!(r>l && b>t)) return null;
+  return { getBoundingClientRect:()=>({left:l,top:t,right:r,bottom:b,width:r-l,height:b-t}) };
+}
+
+/* four shades frame a clear window around the target; a gold ring pulses on it */
+function tutSpotlight(el){
+  const mask=$('#tutmask'), ring=mask.querySelector('.ring'), pad=8;
+  const sh=n=>mask.querySelector(`.shade[data-s="${n}"]`);
+  let r=null;
+  if(el && el.getBoundingClientRect){
+    const b=el.getBoundingClientRect();
+    if(b.width>0 || b.height>0) r={left:b.left-pad, top:b.top-pad, right:b.right+pad, bottom:b.bottom+pad};
+  }
+  if(!r){
+    sh('top').style.cssText='left:0;top:0;width:100%;height:100%;';
+    ['bottom','left','right'].forEach(n=>sh(n).style.cssText='width:0;height:0;');
+    ring.style.opacity='0';
+    return null;
+  }
+  const W=innerWidth, H=innerHeight;
+  ring.style.opacity='1';
+  ring.style.left=r.left+'px'; ring.style.top=r.top+'px';
+  ring.style.width=(r.right-r.left)+'px'; ring.style.height=(r.bottom-r.top)+'px';
+  sh('top').style.cssText=`left:0;top:0;width:100%;height:${Math.max(0,r.top)}px;`;
+  sh('bottom').style.cssText=`left:0;top:${r.bottom}px;width:100%;height:${Math.max(0,H-r.bottom)}px;`;
+  sh('left').style.cssText=`left:0;top:${r.top}px;width:${Math.max(0,r.left)}px;height:${r.bottom-r.top}px;`;
+  sh('right').style.cssText=`left:${r.right}px;top:${r.top}px;width:${Math.max(0,W-r.right)}px;height:${r.bottom-r.top}px;`;
+  return r;
+}
+/* the bubble sits beside the window: below, above, or at the side that is free */
+function tutPlaceBubble(r){
+  const bub=$('#tutbubble');
+  bub.style.display='flex';
+  const bw=bub.offsetWidth, bh=bub.offsetHeight, gap=14, W=innerWidth, H=innerHeight;
+  let left, top;
+  if(!r){ left=(W-bw)/2; top=(H-bh)/2; }
+  else {
+    const spaceR=W-r.right, spaceL=r.left;
+    if(spaceR>=bw+gap*2){ left=r.right+gap; top=(r.top+r.bottom)/2-bh/2; }
+    else if(spaceL>=bw+gap*2){ left=r.left-gap-bw; top=(r.top+r.bottom)/2-bh/2; }
+    else if(r.bottom+gap+bh<H){ top=r.bottom+gap; left=(r.left+r.right)/2-bw/2; }
+    else if(r.top-gap-bh>0){ top=r.top-gap-bh; left=(r.left+r.right)/2-bw/2; }
+    else { top=gap; left=W-bw-gap; }
+  }
+  bub.style.left=Math.max(gap, Math.min(W-bw-gap, left))+'px';
+  bub.style.top=Math.max(gap, Math.min(H-bh-gap, top))+'px';
+}
+function tutHideOverlay(){
+  $('#tutmask').style.display='none';
+  $('#tutbubble').style.display='none';
+  $('#tutpeek').style.display='none';
+}
+function tutFill(eyebrow, title, html, stepTxt){
+  $('#tuteyebrow').textContent=eyebrow;
+  $('#tuttitle').textContent=title;
+  $('#tuttext').innerHTML=html;
+  $('#tuttext').scrollTop=0;
+  $('#tutstep').textContent=stepTxt||'';
+}
+function tutEyebrow(){ const c=TUT.chapter; return c ? `Chapter ${c.n} of ${c.total} · ${c.name}` : 'Tutorial'; }
+
+/* one told step: spotlight + words + Back/Next */
+function tutShow(step){
+  $('#tutpeek').style.display='none';
+  $('#tutmask').style.display='block';
+  const r=tutSpotlight(step.target ? step.target() : null);
+  tutFill(tutEyebrow(), step.title, step.body,
+    TUT.steps.length>1 ? `${TUT.i+1} of ${TUT.steps.length}` : '');
+  $('#tutback').style.visibility = TUT.i>0 ? 'visible' : 'hidden';
+  $('#tutnext').style.display='';
+  $('#tutnext').textContent = step.next || 'Next';
+  tutPlaceBubble(r);
+}
+function tutSeg(steps){
+  if(TUT.skip) return Promise.resolve();
+  TUT.steps=steps; TUT.i=0;
+  return new Promise(res=>{ TUT.done=res; tutShow(steps[0]); });
+}
+$('#tutnext').onclick=()=>{
+  if(!TUT.steps) return;
+  if(TUT.i<TUT.steps.length-1){ TUT.i++; tutShow(TUT.steps[TUT.i]); }
+  else { TUT.steps=null; tutHideOverlay(); const d=TUT.done; TUT.done=null; if(d) d(); }
+};
+$('#tutback').onclick=()=>{ if(TUT.steps && TUT.i>0){ TUT.i--; tutShow(TUT.steps[TUT.i]); } };
+$('#tutmin').onclick=()=>{ $('#tutbubble').style.display='none'; $('#tutmask').style.display='none'; $('#tutpeek').style.display='block'; };
+$('#tutpeek').onclick=()=>{
+  $('#tutpeek').style.display='none';
+  if(TUT.steps) tutShow(TUT.steps[TUT.i]);
+  else $('#tutbubble').style.display='flex';
+};
+addEventListener('resize',()=>{
+  if(TUT.steps && $('#tutbubble').style.display!=='none'){
+    const st=TUT.steps[TUT.i]; tutPlaceBubble(tutSpotlight(st.target?st.target():null));
+  }
+});
+/* a "your move" hint: no shade and no Next, so the player can act at once */
+function tutHint(title, html, anchorFn){
+  TUT.steps=null;
+  $('#tutmask').style.display='none';
+  tutFill('Your move', title, html, '');
+  $('#tutback').style.visibility='hidden';
+  $('#tutnext').style.display='none';
+  let r=null;
+  const el=anchorFn && anchorFn();
+  if(el){ const b=el.getBoundingClientRect(); if(b.width||b.height) r={left:b.left-8,top:b.top-8,right:b.right+8,bottom:b.bottom+8}; }
+  tutPlaceBubble(r);
+  if(!r){ const bub=$('#tutbubble');
+    bub.style.left=Math.max(14, innerWidth-bub.offsetWidth-14)+'px'; bub.style.top='70px'; }
+  return ()=>{ $('#tutnext').style.display=''; tutHideOverlay(); };
+}
+/* a centred notice with one button */
+function tutModal(title, html, btn){
+  if(TUT.skip) return Promise.resolve();
+  TUT.steps=[{title, body:html, next:btn||'Continue'}];
+  TUT.i=0;
+  return new Promise(res=>{ TUT.done=res; tutShow(TUT.steps[0]); });
+}
+
+/* ---------------- the chapters ---------------- */
+function tutBoardSteps(){
+  return [
+    { target:()=>boardSpot(R_TRI+.4), title:'The Triskele and its Courts',
+      body:`At the centre is the <b>Triskele</b>, with its three <b>Courts</b>: the ${fmtH('mountain')}, the ${fmtH('forest')} and the ${fmtH('river')}.<p></p>Glowing <b>Wisps</b> gather in the Courts. When enough gather in one, that Court can be <b>Called</b>, and the game ends.` },
+    { target:()=>boardSpot(BOARD_R), title:'The three Dances',
+      body:`From each Court a <b>Dance</b> of <b>6 stones</b> curls out around the board.<p></p>Your Glamours step onto a dance’s <b>outermost</b> stone and move <b>inward</b>, one stone per step. Reach the <b>innermost</b> stone, beside the Triskele, and you <b>complete the dance</b>.` },
+  ];
+}
+function tutCardSteps(me){
+  return [
+    { target:()=>$('#myhouse'), title:'Your Court: secret',
+      body:`You belong to the ${fmtH(me.house)}. Only you know it.<p></p>Your card also shows a <b>Patron</b>, ${PATRON_NAME[me.patron]}. At the start of any turn you may <b>declare</b> it (turn the card face up) to gain its power, but then everyone knows your Court.` },
+    { target:()=>$('#mystatus'), title:'Your Radiance: unseen',
+      body:`Your <b>Radiance</b> is a number from 1 to 9, and it decides who wins.<p></p>The twist: it <b>faces away from you</b>. Every rival can see it; you cannot.` },
+    { target:()=>standsSpot(), title:'What you can see',
+      body:(()=>{ const fr=tutFacingRival(); const nm=fr?`<b>${fr.p.name}</b>`:'A rival'; const n=fr?fr.p.status:'';
+        return `${nm}’s stand shows a <b>${n}</b>: that is ${fr?'their':'a'} Radiance, facing <b>you</b>. Every rival’s works the same way. Their Courts stay hidden.<p></p>So you know everyone’s number but your own, and no one’s Court but your own.`; })() },
+  ];
+}
+function tutTurnSteps(){
+  return [
+    { target:()=>$('#hand'), title:'Runes',
+      body:`Each turn, <b>play one Rune</b>. Its number is how many steps you move.<p></p>Runes <b>1</b> and <b>2</b> also have a power you use as well; Runes <b>3–5</b> let you use a power <i>instead</i> of moving. Hover a Rune to read it.<p></p>Played Runes come back when all five are used, or skip a turn to reclaim them.` },
+    { target:()=>$('#dancerblock'), title:'Your two Glamours',
+      body:`These are your movers. Entering a dance costs <b>1 step</b> (onto its outermost stone); each step after moves one stone inward.<p></p>You may split a Rune’s steps between both Glamours.`, next:'Try it →' },
+  ];
+}
+async function tutDoMove(me){
+  if(TUT.skip) return;
+  TUT.forceRune=4; renderHUD();
+  const close1=tutHint('Play a Rune', 'Click your <b>4</b>, the only Rune lit. (Its power could instead make a rival redraw a card; here you’ll simply move.)', ()=>$('#hand'));
+  await armHuman(['honor']);
+  close1(); TUT.forceRune=null;
+  if(TUT.skip) return;
+  me.hand.splice(me.hand.indexOf(4),1); me.discard.push(4);
+  log(`${fmtP(me)} plays a <b>4</b>.`); renderHUD();
+  const close2=tutHint('Move 4 steps', 'Click a <b>Glamour</b> in your hand, then a <b>lit stone</b>. Use all 4 steps with one Glamour, or split them.');
+  await allocateHuman(me, me, 4, {noForfeit:true});
+  close2();
+}
+function tutCompleteSteps(){
+  return [
+    { target:()=>boardSpot(BOARD_R), title:'Completing a Dance',
+      body:`When a Glamour reaches the innermost stone:<p></p><b>1.</b> Place a <b>Wisp</b> in <b>any</b> Court.<br><b>2.</b> Choose <b>one</b>: draw a <b>Faerie Magik</b> card, take one of that dance’s two <b>Favors</b>, or <b>Call a Court</b>.<p></p>The Glamour then returns to your hand.` },
+    { target:()=>boardSpot(R_TRI+.4), title:'Calling a Court',
+      body:`Once a Court holds <b>${quorum()} Wisps</b>, you may Call it, but <b>only a Court you belong to</b>. The <b>${coupAt()}th</b> Wisp in a Court forces a Call at once.<p></p>Everyone reveals. Of the Fae who belong to the Called Court, the <b>highest Radiance wins</b>.` },
+  ];
+}
+async function tutWinningTurn(){
+  if(TUT.skip) return;
+  tutHideOverlay();
+  newGame(4, 'dances');
+  const me=G.players[0], r1=G.players[1], r2=G.players[2], r3=G.players[3];
+  const court='forest', dance='Forest Dance';
+  me.house=court; me.status=5; me.patron='king';
+  r1.house=court; r1.status=3; r1.patron='prince';
+  r2.house='mountain'; r2.status=9; r2.patron='queen';
+  r3.house='river'; r3.status=7; r3.patron='princess';
+  G.players.forEach(q=>{ q.declared=false; q.intrigues=[]; });
+  const len=trackLen(dance);
+  me.cands=[{track:dance, steps:len-3},{track:null, steps:0}];
+  me.hand=[3]; me.discard=[1,2,4,5];
+  G.nobles=courtZeros(); G.nobles.forest=quorum()-1; G.nobles.mountain=2; G.nobles.river=1;
+  syncBoard(); renderHUD();
+  TUT.guide={court, lock:null};
+  TUT.staged=true;
+  await tutModal('One turn from winning',
+    `A staged moment. You belong to the ${fmtH(court)}, and it holds <b>${quorum()-1} Wisps</b>, one short of a Call.<p></p>One of your Glamours is <b>3 stones</b> from the end of the Forest Dance, and you hold the <b>3</b> Rune.<p></p>Look at the stands: rivals show a <b>3</b>, a <b>7</b> and a <b>9</b>. You can’t see your own number. Is it safe to Call?`,
+    'Let’s find out');
+  if(TUT.skip) return;
+  TUT.forceRune=3; renderHUD();
+  const close1=tutHint('Play your 3', 'Click your <b>3</b> to move 3.', ()=>$('#hand'));
+  await armHuman(['honor']);
+  close1(); TUT.forceRune=null;
+  if(TUT.skip) return;
+  me.hand=[]; me.discard.push(3);
+  log(`${fmtP(me)} plays a <b>3</b>.`); renderHUD();
+  TUT.guide.lock={ci:0, track:dance, step:len};
+  const close2=tutHint('Finish the Dance', 'Click your Glamour on the board (or in your hand), then the <b>lit stone</b> at the end of the dance.');
+  TUT.afterMove=close2;
+  try{ await allocate(me, me, 3); }
+  catch(e){ if(!(e instanceof GameOver)) throw e; }
+  finally{ close2(); TUT.guide=null; }
+  if(TUT.skip) return;
+  await new Promise(res=>{ TUT.revealContinue=res; });
+}
+/* the reveal of the staged Call says why you won */
+function tutRevealCaption(houseId, caller, winner){
+  const h=HOUSE_BY_ID[houseId];
+  const mates=G.players.filter(p=>p!==caller && p.house===houseId);
+  const high=G.players.filter(p=>p.house!==houseId).sort((a,b)=>b.status-a.status);
+  let html=`You Called the <b style="color:${h.css}">${h.name}</b> and <b>won with a Radiance of ${caller.status}</b>.`;
+  if(mates.length) html+=`<br><br>${mates.map(m=>`<b>${m.name}</b>`).join(', ')} also belonged to the ${h.name}, but held only a <b>${mates[0].status}</b>.`;
+  if(high.length) html+=` ${high.map(p=>`<b>${p.name}</b>’s ${p.status}`).join(' and ')} ${high.length>1?'were':'was'} higher, but in other Courts, so they didn’t count.`;
+  html+=`<br><br><i>Everyone could see your ${caller.status}; you couldn’t. Reading the table is the whole game.</i>`;
+  $('#revsub').innerHTML=html;
+  const b=$('#revbtn');
+  b.textContent='Continue';
+  b.onclick=()=>{ $('#reveal').style.display='none'; const r=TUT.revealContinue; TUT.revealContinue=null; if(r) r(); };
+}
+
+/* ---------------- the tour, and the real game after it ---------------- */
+function tutStartRealGame(){
+  TUT.tourActive=false; TUT.staged=false; TUT.guide=null; TUT.forceRune=null; TUT.chapter=null;
+  TUT.steps=null; TUT.done=null; TUT.revealContinue=null; TUT.afterMove=null;
+  tutHideOverlay();
+  $('#tutskip').style.display='none';
+  $('#reveal').style.display='none';
+  $('#modalwrap').style.display='none';
+  $('#movehud').style.display='none';
+  HUMAN=null; MOVE=null;
+  try{ clearTileHighlights(); }catch(_){}
+  const rb=$('#revbtn'); rb.textContent='Play Again'; rb.onclick=()=>location.reload();
+  if(SCENE && SCENE.callReset) SCENE.callReset();
+  newGame(4, 'dances');
+  syncBoard(); renderHUD();
+  banner('A REAL DANCE BEGINS');
+  log(`<b>A real game.</b> You belong to the ${fmtH(G.players[MY_SEAT].house)}. The Rulebook, Faerie Magik and Dance Favors are all in the Menu.`, 'sys');
+  gameLoop();
+}
+$('#tutskip').onclick=()=>{ TUT.skip=true; tutStartRealGame(); };
+
+async function runTutorial(){
+  bootGame(4, 'dances');
+  makeDraggable($('#tutbubble'));
+  const me=G.players[0];
+  G.nobles.forest=1; G.nobles.mountain=1; syncBoard(); renderHUD();
+  TUT.skip=false; TUT.tourActive=true;
+  $('#tutskip').style.display='block';
+  const CHAPTERS=[
+    ['Welcome',             ()=>tutModal('Welcome to Triskele',
+       `<i>It is Midsummer, and the Fae have begun to dance.</i><p></p><b>Your goal:</b> hold the <b>highest Radiance</b> in the <b>Called Court</b>.<p></p>This short tour shows you the board, your cards, a turn, and a winning Call. You can skip to a real game at any time.`, 'Begin')],
+    ['The Board',           ()=>tutSeg(tutBoardSteps())],
+    ['Your Cards',          ()=>tutSeg(tutCardSteps(me))],
+    ['Your Turn',           async()=>{ await tutSeg(tutTurnSteps()); await tutDoMove(me); }],
+    ['Completing a Dance',  ()=>tutSeg(tutCompleteSteps())],
+    ['Your Winning Turn',   ()=>tutWinningTurn()],
+  ];
+  try{
+    for(let i=0;i<CHAPTERS.length && !TUT.skip;i++){
+      TUT.chapter={n:i+1, total:CHAPTERS.length, name:CHAPTERS[i][0]};
+      await CHAPTERS[i][1]();
+    }
+    if(TUT.skip) return;
+    TUT.chapter=null;
+    $('#tutskip').style.display='none';
+    await tutModal('That’s the game',
+      `Play a Rune, move your Glamours, complete dances, place Wisps, and Call your Court when you think your hidden number is the highest in it.<p></p>Everything else, the Favors, Faerie Magik and the Patrons, is in the <b>Menu</b> at the top right whenever you need it.`,
+      'Play a real game');
+  }catch(e){
+    if(!(e instanceof GameOver)) CONS.error('Tutorial error:', e);
+  }
+  if(!TUT.skip) tutStartRealGame();
+}
+$('#tutGame').onclick=()=>runTutorial();
 
 /* ============================================================
    Part T: the Training Log
