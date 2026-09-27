@@ -2485,6 +2485,11 @@ function init3D(mode){
   // a bright bloom where the pillar leaves the Triskele
   const beamFoot=artHalo(BEAM_W*1.1, 0xffd88a); beamFoot.position.y=TRI_TOP+.3;
   beamFoot.material.opacity=0; beamFoot.material.fog=false; beamFoot.visible=false; scene.add(beamFoot);
+  /* every Triskeled stone answers with a slimmer pillar of its own; the
+     stones' beams share these three layers, built fresh with the stones */
+  const STONE_BEAM_LAYERS=[[1.7,.4],[1.05,.34],[.45,.45]].map(([w,o])=>({w, o,
+    mat:new THREE.MeshBasicMaterial({map:beamTex, transparent:true, opacity:0,
+      blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide, fog:false})}));
 
   // Victory spikes: shafts of light that erupt from the orb and sink back when a Call resolves.
   const orbSpikes=[];
@@ -2839,12 +2844,21 @@ function init3D(mode){
       callT = calling ? callT+Math.min(dt,.1) : 0;
       const rise = Math.max(0, Math.min(1, (callT-.7)/1.8)), riseE = 1-Math.pow(1-rise,3);
       beam.visible = rise>0; beamFoot.visible = rise>0;
+      if(!(rise>0) && SCENE && SCENE.stoneBeams) SCENE.stoneBeams.forEach(g=>{ g.visible=false; });
       if(rise>0){
         beam.rotation.y = Math.atan2(camera.position.x, camera.position.z);
         beam.scale.y = .01 + riseE*BEAM_H;
         const shimmer=.85+.15*Math.sin(t*.006)+.05*Math.sin(t*.017);
         beamLayers.forEach(m=>{ m.material.opacity = m.userData.o*Math.min(1,rise*2)*shimmer; });
         beamFoot.material.opacity = .45*Math.min(1,rise*2)*breath;
+        /* the Triskeled stones kindle a heartbeat later */
+        const rs=Math.max(0, Math.min(1, (callT-1.15)/1.7)), rsE=1-Math.pow(1-rs,3);
+        STONE_BEAM_LAYERS.forEach(L=>{ L.mat.opacity = L.o*Math.min(1,rs*2)*shimmer; });
+        if(SCENE && SCENE.stoneBeams) SCENE.stoneBeams.forEach(g=>{
+          g.visible = rs>0;
+          g.rotation.y = Math.atan2(camera.position.x-g.position.x, camera.position.z-g.position.z);
+          g.scale.y = .01 + rsE*BEAM_H*.85;
+        });
         beamMotes.forEach(d=>{
           d.y += d.v*dt; if(d.y > riseE*BEAM_H) { d.y = Math.random()*2; d.a=Math.random()*6.283; }
           d.a += dt*.8;
@@ -2917,7 +2931,7 @@ function init3D(mode){
   requestAnimationFrame(loop);
  
   const standGroup=new THREE.Group(); scene.add(standGroup);
-  SCENE={scene,pawnGroup,nobleGroup,courtHits,redrawTri,tileGroup,tiles:[],ghosts:[],pawnList:[],iconHits:iconHitList, callCrown:()=>{calling=true;}, callReset:()=>{ calling=false; callT=0; callLight=0; if(camFrom){ cam.phi=camFrom.phi; cam.r=camFrom.r; camFrom=null; placeCam(); } beamMotes.forEach(d=>{ d.s.visible=false; }); }, camera, standGroup};
+  SCENE={scene,pawnGroup,nobleGroup,courtHits,redrawTri,tileGroup,tiles:[],ghosts:[],pawnList:[],iconHits:iconHitList, callCrown:()=>{calling=true;}, stoneBeamLayers:STONE_BEAM_LAYERS, stoneBeams:[], callReset:()=>{ calling=false; callT=0; callLight=0; if(camFrom){ cam.phi=camFrom.phi; cam.r=camFrom.r; camFrom=null; placeCam(); } beamMotes.forEach(d=>{ d.s.visible=false; }); }, camera, standGroup};
   WISP_TRAIL=makeWispTrail(scene, TEX_MOTE);
 }
  
@@ -3221,7 +3235,7 @@ function syncBoard(){
   // each dance is its section of the Triskele
   const TG=SCENE.tileGroup;
   while(TG.children.length) TG.remove(TG.children[0]);
-  SCENE.tiles=[]; SCENE.conjHalos=[];
+  SCENE.tiles=[]; SCENE.conjHalos=[]; SCENE.stoneBeams=[];
   TRACKS.forEach(tr=>{
     G.steps[tr].forEach((st,idx)=>{
       const step=idx+1;
@@ -3259,6 +3273,15 @@ function syncBoard(){
         const halo=new THREE.Sprite(SCENE.conjGlowMat); halo.scale.set(1.7,1.7,1);
         halo.position.set(p.x,y+.05,p.z);
         TG.add(halo); SCENE.conjHalos.push(halo);
+        if(SCENE.stoneBeamLayers){
+          if(!SCENE.stoneBeamGeos){
+            const W=STONE_R*.88*2;
+            SCENE.stoneBeamGeos=SCENE.stoneBeamLayers.map(L=>{ const g=new THREE.PlaneGeometry(W*L.w,1); g.translate(0,.5,0); return g; });
+          }
+          const bg=new THREE.Group(); bg.position.set(p.x, y+.02, p.z); bg.visible=false;
+          SCENE.stoneBeamLayers.forEach((L,k)=>{ const m=new THREE.Mesh(SCENE.stoneBeamGeos[k], L.mat); m.renderOrder=4; bg.add(m); });
+          TG.add(bg); SCENE.stoneBeams.push(bg);
+        }
       }
     });
   });
