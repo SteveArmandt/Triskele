@@ -9535,7 +9535,7 @@ function buildMenuGlade(){
     var pts=[], m, N=260, phi, rr, a0=th+3.1416;
     for(m=0;m<=N;m++){
       phi=m/N*TURNS*6.2832; rr=SPC*Math.exp(-DECAY*phi);
-      pts.push([ccx+Math.cos(a0+phi)*rr, ccy+Math.sin(a0+phi)*rr, rr]);
+      pts.push([ccx+Math.cos(a0-phi)*rr, ccy+Math.sin(a0-phi)*rr, rr]);   // turning the emblem's way
     }
     LEGS.push(pts);
   }
