@@ -7037,6 +7037,22 @@ function aiPickFlip(p){
 /* The call horizon: is any Court within two Wisps of hosting a Call?
    Until then, held Magik is worth more than played Magik — Radiance numbers
    can still be redrawn or swapped, and Wisps snuffed now simply regrow. */
+/* IS A TALL NUMBER WORTH TEARING DOWN YET?
+   The Radiance deck is never rebuilt, so every forced redraw burns a card for
+   good, and a 9 torn away on the first turn is a 4 rune not danced, a Favor
+   or a Magik card not earned, and one fewer redraw left for the moment that
+   matters. A tall number only matters when a Call is coming in a Court its
+   holder may belong to. Until then it is information, not a threat.
+   Policy 'force': 'early' restores the old habit (tear at sight). */
+function tallIsThreat(p, top, m){
+  const mode=seatPol(p,'force');
+  if(mode==='early') return true;
+  if(mode==='off') return false;
+  if(mode==='mine') return G.nobles[p.house]>=quorum()-2 && pInCourt(p,top,p.house)>=0.35 && top.status>m;
+  const near = mode==='later' ? quorum()-1 : quorum()-2;
+  return HOUSES.some(h=>G.nobles[h.id]>=near && pInCourt(p,top,h.id)>=0.35 &&
+                        (!friendlyCourt(p,h.id) || top.status>m));
+}
 function callHorizon(){
   return HOUSES.some(h=>G.nobles[h.id]>=quorum()-2);
 }
@@ -7601,13 +7617,13 @@ async function aiTurn(p){
             if(iLose) defuse=o;
           });
         });
-        if(defuse && Math.random()<0.75){
+        if(defuse && seatPol(p,'defuse')!=='off' && Math.random()<0.75){
           t=defuse;
           /* Against the visible leader, tearing the COURT is the sharper cut:
              the 9 survives but the armed Court is no longer theirs. */
           which = (visibleLeader(p)===defuse && Math.random()<0.5) ? 'court' : 'radiance';
         }
-        else if(top.status>=7 && top.status>m &&
+        else if(top.status>=7 && top.status>m && tallIsThreat(p, top, m) &&
                 Math.random() < (HOUSES.some(h=>G.nobles[h.id]>=quorum()-1 && pInCourt(p,top,h.id)>=0.45) ? 0.92 : 0.7)){
           /* Always the Radiance against a tall number: it strips the card that
              makes them dangerous AND leaves them blind to what replaced it, so
@@ -7615,7 +7631,7 @@ async function aiTurn(p){
              draw can seat them right beside me. */
           t=top; which='radiance';
         }
-        else if(shared && Math.random()<0.55){ t=shared; which='court'; }
+        else if(shared && seatPol(p,'shared')!=='off' && Math.random()<0.55){ t=shared; which='court'; }
         if(t){
           p.hand.splice(p.hand.indexOf(RUNE_FORCE),1); p.discard.push(RUNE_FORCE);
           if(which==='court'){
