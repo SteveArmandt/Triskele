@@ -9952,6 +9952,37 @@ function standsSpot(){
   return { getBoundingClientRect:()=>({left:l,top:t,right:r,bottom:b,width:r-l,height:b-t}) };
 }
 
+function tutAllStandsSpot(){
+  const SG=SCENE && SCENE.standGroup; if(!SG || !SG.children.length) return null;
+  let l=1e9,t=1e9,r=-1e9,b=-1e9;
+  SG.children.forEach(st=>{
+    st.updateMatrixWorld(true);
+    const pts=[]; const box=new THREE.Box3().setFromObject(st.userData.card);
+    for(const x of [box.min.x,box.max.x]) for(const y of [box.min.y,box.max.y]) for(const z of [box.min.z,box.max.z]) pts.push(new THREE.Vector3(x,y,z));
+    const c=new THREE.Vector3(); st.userData.plate.getWorldPosition(c); pts.push(c.clone().add(new THREE.Vector3(0,.8,0)));
+    pts.forEach(v0=>{ const v=v0.project(SCENE.camera);
+      const px=(v.x*.5+.5)*innerWidth, py=(-v.y*.5+.5)*innerHeight;
+      l=Math.min(l,px); r=Math.max(r,px); t=Math.min(t,py); b=Math.max(b,py); });
+  });
+  l=Math.max(0,l-60); r=Math.min(innerWidth,r+60); t=Math.max(0,t); b=Math.min(innerHeight,b);
+  if(!(r>l && b>t)) return null;
+  return { getBoundingClientRect:()=>({left:l,top:t,right:r,bottom:b,width:r-l,height:b-t}) };
+}
+/* one stone on the board: the first whose step passes the test */
+function tutStoneSpot(test){
+  if(!SCENE || !SCENE.tiles) return null;
+  const t=SCENE.tiles.find(t=>{ const u=t.userData; const st=G.steps[u.track] && G.steps[u.track][u.step-1]; return st && test(st,u); });
+  if(!t) return null;
+  t.updateMatrixWorld(true);
+  const box=new THREE.Box3().setFromObject(t);
+  let l=1e9,tp=1e9,r=-1e9,b=-1e9;
+  for(const x of [box.min.x,box.max.x]) for(const y of [box.min.y,box.max.y]) for(const z of [box.min.z,box.max.z]){
+    const v=new THREE.Vector3(x,y,z).project(SCENE.camera);
+    const px=(v.x*.5+.5)*innerWidth, py=(-v.y*.5+.5)*innerHeight;
+    l=Math.min(l,px); r=Math.max(r,px); tp=Math.min(tp,py); b=Math.max(b,py); }
+  const pad=10; l-=pad; r+=pad; tp-=pad; b+=pad;
+  return { getBoundingClientRect:()=>({left:l,top:tp,right:r,bottom:b,width:r-l,height:b-tp}) };
+}
 /* four shades frame a clear window around the target; a gold ring pulses on it */
 function tutSpotlight(el){
   const mask=$('#tutmask'), ring=mask.querySelector('.ring'), pad=8;
@@ -10007,7 +10038,7 @@ function tutFill(eyebrow, title, html, stepTxt){
   $('#tuttext').scrollTop=0;
   $('#tutstep').textContent=stepTxt||'';
 }
-function tutEyebrow(){ const c=TUT.chapter; return c ? `Chapter ${c.n} of ${c.total} · ${c.name}` : 'Tutorial'; }
+function tutEyebrow(){ const c=TUT.chapter; return c ? (c.extra ? 'Going further' : `Chapter ${c.n} of ${c.total} · ${c.name}`) : 'Tutorial'; }
 
 /* one told step: spotlight + words + Back/Next */
 function tutShow(step){
@@ -10067,52 +10098,71 @@ function tutModal(title, html, btn){
 }
 
 /* ---------------- the chapters ---------------- */
-function tutBoardSteps(){
-  return [
-    { target:()=>boardSpot(R_TRI+.4), title:'The Triskele and its Courts',
-      body:`At the centre is the <b>Triskele</b>, with its three <b>Courts</b>: the ${fmtH('mountain')}, the ${fmtH('forest')} and the ${fmtH('river')}.<p></p>Glowing <b>Wisps</b> gather in the Courts. When enough gather in one, that Court can be <b>Called</b>, and the game ends.` },
-    { target:()=>boardSpot(BOARD_R), title:'The three Dances',
-      body:`From each Court a <b>Dance</b> of <b>6 stones</b> curls out around the board.<p></p>Your Glamours step onto a dance’s <b>outermost</b> stone and move <b>inward</b>, one stone per step. Reach the <b>innermost</b> stone, beside the Triskele, and you <b>complete the dance</b>.` },
-  ];
-}
 function tutCardSteps(me){
   return [
+    { target:()=>$('#mystatus'), title:'Your Radiance: hidden from you',
+      body:`Your <b>Radiance</b> is a number from 1 to 9. Higher is better.<p></p>It <b>faces away from you</b>: every rival can see it, but you can’t.` },
+    { target:()=>standsSpot(), title:'Rivals’ Radiance: visible to you',
+      body:(()=>{ const fr=tutFacingRival();
+        return fr ? `<b>${fr.p.name}</b> shows a <b>${fr.p.status}</b>. That is their Radiance. Every rival’s Radiance faces you.`
+                  : `Every rival’s Radiance faces you.`; })() },
     { target:()=>$('#myhouse'), title:'Your Court: secret',
-      body:`You belong to the ${fmtH(me.house)}. Only you know it.<p></p>Your card also shows a <b>Patron</b>, ${PATRON_NAME[me.patron]}. At the start of any turn you may <b>declare</b> it (turn the card face up) to gain its power, but then everyone knows your Court.` },
-    { target:()=>$('#mystatus'), title:'Your Radiance: unseen',
-      body:`Your <b>Radiance</b> is a number from 1 to 9, and it decides who wins.<p></p>The twist: it <b>faces away from you</b>. Every rival can see it; you cannot.` },
-    { target:()=>standsSpot(), title:'What you can see',
-      body:(()=>{ const fr=tutFacingRival(); const nm=fr?`<b>${fr.p.name}</b>`:'A rival'; const n=fr?fr.p.status:'';
-        return `${nm}’s stand shows a <b>${n}</b>: that is ${fr?'their':'a'} Radiance, facing <b>you</b>. Every rival’s works the same way. Their Courts stay hidden.<p></p>So you know everyone’s number but your own, and no one’s Court but your own.`; })() },
+      body:`You belong to the ${fmtH(me.house)}. Only you know it.<p></p>The card also shows a <b>Patron</b>, explained at the end of the tour.` },
+    { target:()=>tutAllStandsSpot(), title:'Rivals’ Courts: hidden',
+      body:`Each rival belongs to a Court too. You can’t see which. Some may share yours.` },
+    { title:'The goal',
+      body:`At the end of the game, one Court is <b>Called</b> and all cards are revealed.<p></p>Of the players in that Court, the <b>highest Radiance wins</b>.`, next:'Continue' },
+  ];
+}
+function tutBoardSteps(){
+  return [
+    { target:()=>boardSpot(R_TRI+.4), title:'The Courts',
+      body:`The three <b>Courts</b> are at the centre: ${fmtH('mountain')}, ${fmtH('forest')} and ${fmtH('river')}.<p></p><b>Wisps</b> are placed in Courts. Enough Wisps let a Court be Called.` },
+    { target:()=>boardSpot(BOARD_R), title:'The Dances',
+      body:`Each Court has a <b>Dance</b>: a spiral of stones.<p></p>Enter at the <b>outermost</b> stone and move <b>inward</b>. Reaching the <b>innermost</b> stone <b>completes</b> the dance.` },
   ];
 }
 function tutTurnSteps(){
   return [
-    { target:()=>$('#hand'), title:'Runes',
-      body:`Each turn, <b>play one Rune</b>. Its number is how many steps you move.<p></p>Runes <b>1</b> and <b>2</b> also have a power you use as well; Runes <b>3–5</b> let you use a power <i>instead</i> of moving. Hover a Rune to read it.<p></p>Played Runes come back when all five are used, or skip a turn to reclaim them.` },
     { target:()=>$('#dancerblock'), title:'Your two Glamours',
-      body:`These are your movers. Entering a dance costs <b>1 step</b> (onto its outermost stone); each step after moves one stone inward.<p></p>You may split a Rune’s steps between both Glamours.`, next:'Try it →' },
+      body:`Your movers. Entering a dance onto its outermost stone costs <b>1 step</b>. Each further step moves one stone inward.` },
+    { target:()=>$('#hand'), title:'Runes',
+      body:`Each turn, <b>play one Rune</b>. Its number is how many steps you get. You may split them between your Glamours.<p></p>Played Runes return when all five are used, or skip a turn to reclaim them.<p></p>Runes also have powers, explained at the end of the tour.`, next:'Try it →' },
   ];
 }
 async function tutDoMove(me){
   if(TUT.skip) return;
   TUT.forceRune=4; renderHUD();
-  const close1=tutHint('Play a Rune', 'Click your <b>4</b>, the only Rune lit. (Its power could instead make a rival redraw a card; here you’ll simply move.)', ()=>$('#hand'));
+  const close1=tutHint('Play a Rune', 'Click your <b>4</b>.', ()=>$('#hand'));
   await armHuman(['honor']);
   close1(); TUT.forceRune=null;
   if(TUT.skip) return;
   me.hand.splice(me.hand.indexOf(4),1); me.discard.push(4);
   log(`${fmtP(me)} plays a <b>4</b>.`); renderHUD();
-  const close2=tutHint('Move 4 steps', 'Click a <b>Glamour</b> in your hand, then a <b>lit stone</b>. Use all 4 steps with one Glamour, or split them.');
+  const close2=tutHint('Move 4 steps', 'Click a <b>Glamour</b>, then a <b>lit stone</b>.');
   await allocateHuman(me, me, 4, {noForfeit:true});
   close2();
 }
 function tutCompleteSteps(){
   return [
     { target:()=>boardSpot(BOARD_R), title:'Completing a Dance',
-      body:`When a Glamour reaches the innermost stone:<p></p><b>1.</b> Place a <b>Wisp</b> in <b>any</b> Court.<br><b>2.</b> Choose <b>one</b>: draw a <b>Faerie Magik</b> card, take one of that dance’s two <b>Favors</b>, or <b>Call a Court</b>.<p></p>The Glamour then returns to your hand.` },
+      body:`When a Glamour reaches the innermost stone:<br><b>1.</b> Place a <b>Wisp</b> in <b>any</b> Court.<br><b>2.</b> Choose one: draw <b>Faerie Magik</b>, take a <b>Favor</b> of that dance, or <b>Call a Court</b>.<p></p>The Glamour returns to your reserve.` },
     { target:()=>boardSpot(R_TRI+.4), title:'Calling a Court',
-      body:`Once a Court holds <b>${quorum()} Wisps</b>, you may Call it, but <b>only a Court you belong to</b>. The <b>${coupAt()}th</b> Wisp in a Court forces a Call at once.<p></p>Everyone reveals. Of the Fae who belong to the Called Court, the <b>highest Radiance wins</b>.` },
+      body:`At <b>${quorum()} Wisps</b> a Court may be Called, but only by a player who belongs to it. The <b>${coupAt()}th</b> Wisp forces a Call.<p></p>Call when you think your Radiance is the highest in your Court.` },
+  ];
+}
+function tutExtraSteps(){
+  return [
+    { target:()=>$('#myhouse'), title:'Patrons',
+      body:`At the start of a turn you may <b>declare</b> your Patron: turn your Court card face up for good. You gain its power, and everyone sees your Court.<p></p><b>Queen</b>: +2 Radiance at the Call; wins ties.<br><b>King</b>: +1 step each turn you dance a Rune.<br><b>Prince</b>: place 1 Wisp when you declare; no Wisp can be lured out of your Court.<br><b>Princess</b>: also belongs to the next Court (Mountain → Forest → River → Mountain).` },
+    { target:()=>tutStoneSpot(st=>st.c), title:'Stones',
+      body:`Every stone has two sides: <b>land</b> and <b>Triskeled</b> (the gold spiral). Each dance begins with its <b>outermost</b> stone Triskeled.<p></p>Only Triskeled stones can move. Moving one to the outer end of another dance makes the first dance <b>shorter</b> and the second <b>longer</b>.<p></p>A Triskeled stone never flips back.` },
+    { target:()=>$('#hand'), title:'Rune powers',
+      body:`<b>1</b>: flip a land stone to its Triskeled side (Glamours on it return to reserve), then move 1.<br><b>2</b>: move a Triskeled stone to the outer end of any dance (Glamours on it ride along), then move 2.<br><b>3</b>: move 3, <i>or</i> redraw your own Court or Radiance.<br><b>4</b>: move 4, <i>or</i> make a rival redraw their Court or Radiance.<br><b>5</b>: move 5, <i>or</i> lure a Wisp to another Court.` },
+    { target:()=>boardSpot(BOARD_R), title:'Favors',
+      body:`Each dance offers two Favors, one of which you may take on completing it:<br><b>River</b>: swap Radiance with a rival, or peek at your own.<br><b>Forest</b>: lure a Wisp to another Court, or snuff two Wisps.<br><b>Mountain</b>: swap Courts with a rival, or peek at a rival’s Court.` },
+    { target:()=>$('#intrcol'), title:'Faerie Magik',
+      body:`Secret cards, drawn as a completion reward. Most can be played anytime, even on a rival’s turn: add, move or remove a Wisp, peek at a hidden card, or cancel another Magik. Hover a card to read it.`, next:'Play a real game' },
   ];
 }
 async function tutWinningTurn(){
@@ -10134,8 +10184,8 @@ async function tutWinningTurn(){
   TUT.guide={court, lock:null};
   TUT.staged=true;
   await tutModal('One turn from winning',
-    `A staged moment. You belong to the ${fmtH(court)}, and it holds <b>${quorum()-1} Wisps</b>, one short of a Call.<p></p>One of your Glamours is <b>3 stones</b> from the end of the Forest Dance, and you hold the <b>3</b> Rune.<p></p>Look at the stands: rivals show a <b>3</b>, a <b>7</b> and a <b>9</b>. You can’t see your own number. Is it safe to Call?`,
-    'Let’s find out');
+    `A staged turn. You belong to the ${fmtH(court)}, which holds <b>${quorum()-1} Wisps</b>.<p></p>A Glamour of yours is <b>3 stones</b> from the end of the Forest Dance, and you hold a <b>3</b>.<p></p>Rivals show <b>3</b>, <b>7</b> and <b>9</b>. Should you Call?`,
+    'Play it');
   if(TUT.skip) return;
   TUT.forceRune=3; renderHUD();
   const close1=tutHint('Play your 3', 'Click your <b>3</b> to move 3.', ()=>$('#hand'));
@@ -10198,9 +10248,9 @@ async function runTutorial(){
   $('#tutskip').style.display='block';
   const CHAPTERS=[
     ['Welcome',             ()=>tutModal('Welcome to Triskele',
-       `<i>It is Midsummer, and the Fae have begun to dance.</i><p></p><b>Your goal:</b> hold the <b>highest Radiance</b> in the <b>Called Court</b>.<p></p>This short tour shows you the board, your cards, a turn, and a winning Call. You can skip to a real game at any time.`, 'Begin')],
-    ['The Board',           ()=>tutSeg(tutBoardSteps())],
+       `<b>Goal:</b> have the <b>highest Radiance</b> in the Court that is <b>Called</b>.<p></p>First, your two cards. You can skip to a real game at any time.`, 'Begin')],
     ['Your Cards',          ()=>tutSeg(tutCardSteps(me))],
+    ['The Board',           ()=>tutSeg(tutBoardSteps())],
     ['Your Turn',           async()=>{ await tutSeg(tutTurnSteps()); await tutDoMove(me); }],
     ['Completing a Dance',  ()=>tutSeg(tutCompleteSteps())],
     ['Your Winning Turn',   ()=>tutWinningTurn()],
@@ -10212,10 +10262,22 @@ async function runTutorial(){
     }
     if(TUT.skip) return;
     TUT.chapter=null;
+    tutHideOverlay();
+    const more=await choose('That’s the game',
+      `<b>Remember the goal:</b> when a Court is Called, the <b>highest Radiance</b> among its players wins. Everyone sees your Radiance but you.`,
+      [{label:'Play a real game', value:false},
+       {label:'Going further', sub:'Patrons, Rune powers, Favors and Faerie Magik', value:true}]);
+    if(TUT.skip) return;
+    if(more){
+      /* a calm, fresh table for the extras: the Call's light put out */
+      $('#reveal').style.display='none';
+      if(SCENE && SCENE.callReset) SCENE.callReset();
+      newGame(4, 'dances'); syncBoard(); renderHUD();
+      TUT.chapter={extra:true};
+      await tutSeg(tutExtraSteps());
+      TUT.chapter=null;
+    }
     $('#tutskip').style.display='none';
-    await tutModal('That’s the game',
-      `Play a Rune, move your Glamours, complete dances, place Wisps, and Call your Court when you think your hidden number is the highest in it.<p></p>Everything else, the Favors, Faerie Magik and the Patrons, is in the <b>Menu</b> at the top right whenever you need it.`,
-      'Play a real game');
   }catch(e){
     if(!(e instanceof GameOver)) CONS.error('Tutorial error:', e);
   }
